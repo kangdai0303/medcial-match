@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医学连连看 - 疾病症状匹配游戏</title>
+    <style>
+        /* 使用系统字体替代外部字体，确保离线可用 */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            overflow-y: auto;
+            position: relative;
+            padding: 20px 0;
+        }
+
+        /* 动态背景粒子效果 */
+        .bg-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.1; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.3; }
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            box-shadow: 
+                0 25px 50px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.2);
+            padding: 25px;
+            width: 95%;
+            max-width: 1100px;
+            position: relative;
+            z-index: 10;
+            animation: slideIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .game-title {
+            color: #1a1a2e;
+            font-size: 2.8rem;
+            margin-bottom: 8px;
+            text-shadow: 
+                3px 3px 6px rgba(0,0,0,0.2),
+                0 0 30px rgba(255,255,255,0.3);
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: titlePulse 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes titlePulse {
+            0% { text-shadow: 3px 3px 6px rgba(0,0,0,0.2), 0 0 20px rgba(102, 126, 234, 0.3); }
+            100% { text-shadow: 3px 3px 6px rgba(0,0,0,0.2), 0 0 40px rgba(118, 75, 162, 0.5); }
+        }
+
+        .game-subtitle {
+            color: #555;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* 倒计时器样式 - 固定定位 */
+        .timer-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .timer-container:hover {
+            transform: scale(1.05);
+            box-shadow: 
+                0 12px 40px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .timer-circle {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: conic-gradient(
+                from 0deg,
+                #ff6b6b 0deg,
+                #ffd93d 72deg,
+                #51cf66 144deg,
+                #4dabf7 216deg,
+                #9775fa 288deg,
+                #ff6b6b 360deg
+            );
+            animation: rotate 20s linear infinite paused;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+
+        .timer-circle::before {
+            content: '';
+            position: absolute;
+            width: 85px;
+            height: 85px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,240,250,0.95) 100%);
+            border-radius: 50%;
+            box-shadow: 
+                inset 0 2px 8px rgba(0,0,0,0.1),
+                0 2px 4px rgba(255,255,255,0.3);
+        }
+
+        .timer-display {
+            position: relative;
+            z-index: 5;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #1a1a2e;
+            text-shadow: 
+                1px 1px 2px rgba(0,0,0,0.2),
+                0 0 10px rgba(79, 172, 254, 0.3);
+            animation: digitalPulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes digitalPulse {
+            0% { 
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.2), 0 0 8px rgba(79, 172, 254, 0.3);
+                transform: scale(1);
+            }
+            100% { 
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.2), 0 0 15px rgba(118, 75, 162, 0.5);
+                transform: scale(1.02);
+            }
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .timer-warning {
+            animation: warningPulse 0.3s ease-in-out infinite alternate !important;
+        }
+
+        @keyframes warningPulse {
+            0% { 
+                color: #ff4757; 
+                transform: scale(1);
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.2), 0 0 15px rgba(255, 71, 87, 0.8);
+            }
+            100% { 
+                color: #ff3742; 
+                transform: scale(1.08);
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.2), 0 0 25px rgba(255, 71, 87, 1);
+            }
+        }
+
+        /* 时间紧迫时整个计时器的警告效果 */
+        .timer-container.urgent {
+            animation: timerUrgent 0.5s ease-in-out infinite alternate;
+            border-color: rgba(255, 71, 87, 0.6);
+            background: rgba(255, 71, 87, 0.1);
+        }
+
+        @keyframes timerUrgent {
+            0% { 
+                transform: scale(1);
+                box-shadow: 0 8px 32px rgba(255, 71, 87, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+            100% { 
+                transform: scale(1.03);
+                box-shadow: 0 12px 40px rgba(255, 71, 87, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            }
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            padding: 20px 30px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.1),
+                inset 0 1px 0 rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .score-item {
+            text-align: center;
+            position: relative;
+        }
+
+        .score-label {
+            color: #555;
+            font-size: 0.85rem;
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .score-value {
+            color: #1a1a2e;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            animation: scoreGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes scoreGlow {
+            0% { text-shadow: 1px 1px 2px rgba(0,0,0,0.1), 0 0 5px rgba(102, 126, 234, 0.3); }
+            100% { text-shadow: 1px 1px 2px rgba(0,0,0,0.1), 0 0 10px rgba(118, 75, 162, 0.4); }
+        }
+
+        /* 进度条样式 */
+        .progress-container {
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            height: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #51cf66, #4dabf7, #9775fa);
+            border-radius: 15px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
+            animation: progressGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes progressGlow {
+            0% { box-shadow: 0 0 10px rgba(81, 207, 102, 0.5); }
+            100% { box-shadow: 0 0 20px rgba(77, 171, 247, 0.8); }
+        }
+
+        .game-board {
+            display: flex;
+            justify-content: space-between;
+            gap: 50px;
+            margin: 40px 0;
+        }
+
+        .column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .column-title {
+            text-align: center;
+            font-size: 1.4rem;
+            color: #4a5568;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #edf2f7;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 18px;
+            color: white;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: 
+                0 8px 20px rgba(79, 172, 254, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            min-height: 85px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.5;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+            border-radius: 16px;
+            pointer-events: none;
+        }
+
+        .card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 
+                0 15px 35px rgba(79, 172, 254, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .card.selected {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 100%);
+            transform: scale(1.08);
+            box-shadow: 
+                0 12px 30px rgba(255, 107, 107, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            animation: selectedPulse 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes selectedPulse {
+            0% { box-shadow: 0 12px 30px rgba(255, 107, 107, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+            100% { box-shadow: 0 15px 40px rgba(255, 107, 107, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+        }
+
+        .card.matched {
+            background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+            transform: scale(0.95);
+            opacity: 0.8;
+            cursor: not-allowed;
+            box-shadow: 
+                0 5px 15px rgba(81, 207, 102, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            animation: matchedGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes matchedGlow {
+            0% { box-shadow: 0 5px 15px rgba(81, 207, 102, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+            100% { box-shadow: 0 8px 25px rgba(81, 207, 102, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+        }
+
+        .symptom-card {
+            background: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);
+            box-shadow: 
+                0 8px 20px rgba(167, 139, 250, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .symptom-card:hover {
+            box-shadow: 
+                0 15px 35px rgba(167, 139, 250, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .symptom-card.selected {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 100%);
+            box-shadow: 
+                0 12px 30px rgba(255, 107, 107, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            animation: selectedPulse 1s ease-in-out infinite alternate;
+        }
+
+        .symptom-card.matched {
+            background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+            animation: matchedGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .game-message {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2rem;
+            font-weight: 500;
+            min-height: 30px;
+        }
+
+        .success-message {
+            color: #51cf66;
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .level-complete {
+            background: rgba(81, 207, 102, 0.1);
+            border: 2px solid #51cf66;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .level-complete h3 {
+            color: #51cf66;
+            margin-bottom: 10px;
+        }
+
+        /* 庆祝动画 */
+        @keyframes celebration {
+            0% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.02) rotate(1deg); }
+            50% { transform: scale(1.05) rotate(0deg); }
+            75% { transform: scale(1.02) rotate(-1deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        /* 摇晃动画 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+            20%, 40%, 60%, 80% { transform: translateX(3px); }
+        }
+
+        /* 紧急提示样式 */
+        .urgent-warning {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 71, 87, 0.95);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 1000;
+            animation: urgentPulse 0.5s ease-in-out infinite alternate;
+            box-shadow: 0 10px 30px rgba(255, 71, 87, 0.5);
+        }
+
+        @keyframes urgentPulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            100% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        /* 分享功能样式 */
+        .share-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .share-modal {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 25px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            animation: slideInUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .share-title {
+            color: #1a1a2e;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .share-subtitle {
+            color: #555;
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+        }
+
+        .nickname-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 15px;
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.8);
+            color: #1a1a2e;
+            transition: all 0.3s ease;
+        }
+
+        .nickname-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .share-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        .share-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            max-width: 150px;
+        }
+
+        .share-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .share-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .share-btn.secondary {
+            background: rgba(108, 117, 125, 0.1);
+            color: #6c757d;
+            border: 2px solid rgba(108, 117, 125, 0.2);
+        }
+
+        .share-btn.secondary:hover {
+            background: rgba(108, 117, 125, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* 分享卡片预览 */
+        .share-preview {
+            margin: 25px 0;
+            display: none;
+        }
+
+        .share-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 30px;
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+        }
+
+        .share-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { transform: rotate(0deg); opacity: 0.3; }
+            50% { transform: rotate(180deg); opacity: 0.1; }
+        }
+
+        .share-card-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .share-card-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .share-card-nickname {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .share-card-stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+
+        .share-card-stat {
+            text-align: center;
+        }
+
+        .share-card-stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .share-card-stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .share-qr-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .share-qr-code {
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .share-qr-text {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* 关闭按钮 */
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 2rem;
+            color: #999;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: #666;
+        }
+
+        /* Canvas隐藏 */
+        #share-canvas {
+            display: none;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .share-modal {
+                padding: 30px 20px;
+                margin: 20px;
+                max-height: 85vh;
+            }
+
+            .share-title {
+                font-size: 1.6rem;
+            }
+
+            .share-buttons {
+                flex-direction: column;
+            }
+
+            .share-btn {
+                max-width: none;
+            }
+
+            .share-card-stats {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .game-board {
+                flex-direction: column;
+                gap: 30px;
+            }
+            
+            .game-title {
+                font-size: 2rem;
+            }
+            
+            .timer-container {
+                top: 15px;
+                right: 15px;
+                width: 90px;
+                height: 90px;
+            }
+            
+            .timer-circle {
+                width: 75px;
+                height: 75px;
+            }
+            
+            .timer-circle::before {
+                width: 65px;
+                height: 65px;
+            }
+            
+            .timer-display {
+                font-size: 1.4rem;
+            }
+            
+            .card {
+                font-size: 1rem;
+                padding: 15px;
+                min-height: 70px;
+            }
+            
+            .score-board {
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+            
+            .score-item {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 动态背景粒子 -->
+    <div class="bg-particles" id="bg-particles"></div>
+    
+    <!-- 固定倒计时器 -->
+    <div class="timer-container" id="timer-container">
+        <div class="timer-circle" id="timer-circle">
+            <div class="timer-display" id="timer-display">20</div>
+        </div>
+    </div>
+    
+    <div class="game-container">
+        <div class="game-header">
+            <h1 class="game-title">🏥 医学连连看</h1>
+            <p class="game-subtitle">匹配疾病与其典型表现 - 争分夺秒！</p>
+        </div>
+
+        <div class="score-board">
+            <div class="score-item">
+                <span class="score-label">关卡</span>
+                <span class="score-value" id="current-level">1</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">得分</span>
+                <span class="score-value" id="score">0</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">匹配</span>
+                <span class="score-value" id="matches">0/4</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">连击</span>
+                <span class="score-value" id="combo">0</span>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+        </div>
+
+        <div class="game-message" id="game-message"></div>
+
+        <div class="game-board">
+            <div class="column">
+                <div class="column-title">🦠 疾病</div>
+                <div id="diseases-column"></div>
+            </div>
+            
+            <div class="column">
+                <div class="column-title">🩺 典型表现</div>
+                <div id="symptoms-column"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="next-level-btn" style="display: none;">下一关</button>
+            <button class="btn" id="restart-btn">重新开始</button>
+            <button class="btn" id="shuffle-btn">重新排列</button>
+        </div>
+    </div>
+
+    <!-- 分享弹窗 -->
+    <div class="share-overlay" id="share-overlay">
+        <div class="share-modal">
+            <button class="close-btn" id="close-share-btn">&times;</button>
+            
+            <div class="share-title">🎉 分享你的成绩</div>
+            <div class="share-subtitle">让朋友们看看你的医学知识有多厉害！</div>
+            
+            <input type="text" 
+                   class="nickname-input" 
+                   id="nickname-input" 
+                   placeholder="输入你的昵称（如：医学小达人）" 
+                   maxlength="20">
+            
+            <div class="share-buttons" id="share-initial-buttons">
+                <button class="share-btn primary" id="generate-share-btn">生成分享卡片</button>
+                <button class="share-btn secondary" id="cancel-share-btn">暂不分享</button>
+            </div>
+            
+            <!-- 分享卡片预览 -->
+            <div class="share-preview" id="share-preview">
+                <div class="share-card">
+                    <div class="share-card-content">
+                        <div class="share-card-title">🏥 医学连连看</div>
+                        <div class="share-card-nickname" id="share-card-nickname">医学达人</div>
+                        
+                        <div class="share-card-stats">
+                            <div class="share-card-stat">
+                                <span class="share-card-stat-value" id="share-card-level">1</span>
+                                <div class="share-card-stat-label">关卡</div>
+                            </div>
+                            <div class="share-card-stat">
+                                <span class="share-card-stat-value" id="share-card-score">0</span>
+                                <div class="share-card-stat-label">分数</div>
+                            </div>
+                            <div class="share-card-stat">
+                                <span class="share-card-stat-value" id="share-card-time">20</span>
+                                <div class="share-card-stat-label">剩余时间</div>
+                            </div>
+                        </div>
+                        
+                        <div class="share-qr-section">
+                            <div class="share-qr-text">扫码挑战同款游戏</div>
+                            <div class="share-qr-code">
+                                <img id="qr-code-img" src="" alt="游戏二维码" style="width: 120px; height: 120px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="share-buttons" style="margin-top: 20px;">
+                    <button class="share-btn primary" id="download-share-btn">保存图片</button>
+                    <button class="share-btn secondary" id="regenerate-share-btn">重新生成</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用于生成分享图片的Canvas -->
+    <canvas id="share-canvas" width="400" height="600"></canvas>
+
+    <script>
+        class MedicalMatchGame {
+            constructor() {
+                this.currentLevel = 1;
+                this.score = 0;
+                this.matches = 0;
+                this.combo = 0;
+                this.selectedDisease = null;
+                this.selectedSymptom = null;
+                this.matchedPairs = new Set();
+                this.timeLeft = 20;
+                this.timerInterval = null;
+                this.gameActive = false;
+                this.shareData = {
+                    nickname: '',
+                    level: 1,
+                    score: 0,
+                    timeLeft: 20,
+                    completed: false
+                };
+                
+                this.levels = [
+                    // 第一关 - 基础疾病
+                    {
+                        pairs: [
+                            { disease: "急性心肌梗死", symptom: "胸骨后剧烈疼痛，向左臂放射" },
+                            { disease: "急性阑尾炎", symptom: "右下腹固定性疼痛，麦氏点压痛" },
+                            { disease: "糖尿病酮症酸中毒", symptom: "烂苹果味口气，深快呼吸" },
+                            { disease: "急性胰腺炎", symptom: "上腹部剧痛向腰背部放射" }
+                        ]
+                    },
+                    // 第二关 - 神经系统疾病
+                    {
+                        pairs: [
+                            { disease: "脑膜炎", symptom: "颈项强直，克尼格征阳性" },
+                            { disease: "帕金森病", symptom: "静止性震颤，面具脸" },
+                            { disease: "癫痫大发作", symptom: "意识丧失，全身强直阵挛" },
+                            { disease: "偏头痛", symptom: "单侧搏动性头痛，畏光畏声" }
+                        ]
+                    },
+                    // 第三关 - 呼吸系统疾病
+                    {
+                        pairs: [
+                            { disease: "肺炎", symptom: "咳嗽、咳痰，肺部湿性啰音" },
+                            { disease: "哮喘", symptom: "呼气性呼吸困难，哮鸣音" },
+                            { disease: "气胸", symptom: "突发胸痛，患侧呼吸音消失" },
+                            { disease: "肺水肿", symptom: "粉红色泡沫痰，端坐呼吸" }
+                        ]
+                    },
+                    // 第四关 - 消化系统疾病
+                    {
+                        pairs: [
+                            { disease: "消化性溃疡", symptom: "节律性上腹痛，空腹痛或餐后痛" },
+                            { disease: "胆石症", symptom: "右上腹绞痛，墨菲征阳性" },
+                            { disease: "肠梗阻", symptom: "腹痛、腹胀、呕吐、停止排气排便" },
+                            { disease: "急性胃炎", symptom: "上腹痛、恶心呕吐、食欲不振" }
+                        ]
+                    }
+                ];
+                
+                this.init();
+            }
+            
+            init() {
+                this.createParticles();
+                this.updateDisplay();
+                this.loadLevel();
+                this.bindEvents();
+            }
+            
+            createParticles() {
+                const particlesContainer = document.getElementById('bg-particles');
+                for (let i = 0; i < 20; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.top = Math.random() * 100 + '%';
+                    particle.style.width = (Math.random() * 4 + 2) + 'px';
+                    particle.style.height = particle.style.width;
+                    particle.style.animationDelay = Math.random() * 6 + 's';
+                    particlesContainer.appendChild(particle);
+                }
+            }
+            
+            bindEvents() {
+                document.getElementById('restart-btn').addEventListener('click', () => this.restart());
+                document.getElementById('shuffle-btn').addEventListener('click', () => this.shuffle());
+                document.getElementById('next-level-btn').addEventListener('click', () => this.nextLevel());
+                
+                // 分享相关事件
+                document.getElementById('close-share-btn').addEventListener('click', () => this.hideShareModal());
+                document.getElementById('cancel-share-btn').addEventListener('click', () => this.hideShareModal());
+                document.getElementById('generate-share-btn').addEventListener('click', () => this.generateShareCard());
+                document.getElementById('download-share-btn').addEventListener('click', () => this.downloadShareImage());
+                document.getElementById('regenerate-share-btn').addEventListener('click', () => this.regenerateShareCard());
+                
+                // 点击遮罩关闭弹窗
+                document.getElementById('share-overlay').addEventListener('click', (e) => {
+                    if (e.target.id === 'share-overlay') {
+                        this.hideShareModal();
+                    }
+                });
+            }
+            
+            loadLevel() {
+                if (this.currentLevel > this.levels.length) {
+                    this.stopTimer();
+                    this.showMessage("🎉 恭喜完成所有关卡！", "success-message");
+                    this.playGameEndAnimation();
+                    return;
+                }
+                
+                const level = this.levels[this.currentLevel - 1];
+                this.currentPairs = [...level.pairs];
+                this.matches = 0;
+                this.combo = 0;
+                this.matchedPairs.clear();
+                this.selectedDisease = null;
+                this.selectedSymptom = null;
+                this.timeLeft = 20;
+                this.gameActive = true;
+                
+                this.renderCards();
+                this.updateDisplay();
+                this.startTimer();
+                this.showMessage(`第${this.currentLevel}关开始！争分夺秒！⚡`, "");
+                this.playLevelStartAnimation();
+                
+                document.getElementById('next-level-btn').style.display = 'none';
+            }
+            
+            startTimer() {
+                this.stopTimer();
+                const timerContainer = document.getElementById('timer-container');
+                const timerCircle = document.getElementById('timer-circle');
+                const timerDisplay = document.getElementById('timer-display');
+                
+                timerCircle.style.animationPlayState = 'running';
+                timerDisplay.classList.remove('timer-warning');
+                timerContainer.classList.remove('urgent');
+                
+                this.timerInterval = setInterval(() => {
+                    this.timeLeft--;
+                    timerDisplay.textContent = this.timeLeft;
+                    
+                    // 更新进度条
+                    const progress = ((20 - this.timeLeft) / 20) * 100;
+                    document.getElementById('progress-bar').style.width = progress + '%';
+                    
+                    // 时间警告效果
+                    if (this.timeLeft <= 5) {
+                        timerDisplay.classList.add('timer-warning');
+                        timerContainer.classList.add('urgent');
+                        if (this.timeLeft <= 3) {
+                            this.shakeScreen();
+                        }
+                    }
+                    
+                    // 时间到
+                    if (this.timeLeft <= 0) {
+                        this.timeUp();
+                    }
+                }, 1000);
+            }
+            
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+                const timerCircle = document.getElementById('timer-circle');
+                timerCircle.style.animationPlayState = 'paused';
+            }
+            
+            timeUp() {
+                this.stopTimer();
+                this.gameActive = false;
+                this.showMessage("⏰ 时间到！挑战失败！", "error-message");
+                this.playFailAnimation();
+                
+                // 更新分享数据
+                this.updateShareData(false);
+                
+                setTimeout(() => {
+                    this.askForShare();
+                    setTimeout(() => {
+                        if (confirm("时间到了！是否重新挑战这一关？")) {
+                            this.loadLevel();
+                        } else {
+                            this.restart();
+                        }
+                    }, 1000);
+                }, 2000);
+            }
+            
+            shakeScreen() {
+                const container = document.querySelector('.game-container');
+                container.style.animation = 'none';
+                container.offsetHeight; // 触发重流
+                container.style.animation = 'shake 0.5s ease-in-out';
+                setTimeout(() => {
+                    container.style.animation = 'slideIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                }, 500);
+            }
+            
+            playLevelStartAnimation() {
+                const container = document.querySelector('.game-container');
+                container.style.transform = 'scale(1.02)';
+                setTimeout(() => {
+                    container.style.transform = 'scale(1)';
+                }, 300);
+            }
+            
+            playFailAnimation() {
+                const timerDisplay = document.getElementById('timer-display');
+                timerDisplay.style.animation = 'none';
+                timerDisplay.offsetHeight;
+                timerDisplay.style.animation = 'shake 1s ease-in-out';
+            }
+            
+            playGameEndAnimation() {
+                const title = document.querySelector('.game-title');
+                title.style.animation = 'titlePulse 0.5s ease-in-out infinite alternate';
+            }
+            
+            renderCards() {
+                const diseasesColumn = document.getElementById('diseases-column');
+                const symptomsColumn = document.getElementById('symptoms-column');
+                
+                // 清空现有内容
+                diseasesColumn.innerHTML = '';
+                symptomsColumn.innerHTML = '';
+                
+                // 随机打乱顺序
+                const shuffledDiseases = this.shuffleArray([...this.currentPairs]);
+                const shuffledSymptoms = this.shuffleArray([...this.currentPairs]);
+                
+                // 渲染疾病卡片
+                shuffledDiseases.forEach((pair, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.textContent = pair.disease;
+                    card.dataset.disease = pair.disease;
+                    card.dataset.index = index;
+                    card.addEventListener('click', () => this.selectDisease(card, pair.disease));
+                    diseasesColumn.appendChild(card);
+                });
+                
+                // 渲染症状卡片
+                shuffledSymptoms.forEach((pair, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'card symptom-card';
+                    card.textContent = pair.symptom;
+                    card.dataset.symptom = pair.symptom;
+                    card.dataset.index = index;
+                    card.addEventListener('click', () => this.selectSymptom(card, pair.symptom));
+                    symptomsColumn.appendChild(card);
+                });
+            }
+            
+            selectDisease(card, disease) {
+                if (card.classList.contains('matched') || !this.gameActive) return;
+                
+                // 清除之前的选择
+                document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                
+                card.classList.add('selected');
+                this.selectedDisease = disease;
+                this.selectedDiseaseCard = card;
+                this.playSelectSound();
+                
+                this.checkMatch();
+            }
+            
+            selectSymptom(card, symptom) {
+                if (card.classList.contains('matched') || !this.gameActive) return;
+                
+                // 清除之前的症状选择
+                document.querySelectorAll('.symptom-card').forEach(c => c.classList.remove('selected'));
+                
+                card.classList.add('selected');
+                this.selectedSymptom = symptom;
+                this.selectedSymptomCard = card;
+                this.playSelectSound();
+                
+                this.checkMatch();
+            }
+            
+            playSelectSound() {
+                // 模拟点击音效的视觉反馈
+                const cards = document.querySelectorAll('.card.selected');
+                cards.forEach(card => {
+                    card.style.transform = card.style.transform.replace('scale(1.08)', 'scale(1.12)');
+                    setTimeout(() => {
+                        card.style.transform = card.style.transform.replace('scale(1.12)', 'scale(1.08)');
+                    }, 100);
+                });
+            }
+            
+            checkMatch() {
+                if (!this.selectedDisease || !this.selectedSymptom) return;
+                
+                // 找到匹配的配对
+                const matchedPair = this.currentPairs.find(pair => 
+                    pair.disease === this.selectedDisease && pair.symptom === this.selectedSymptom
+                );
+                
+                if (matchedPair) {
+                    this.handleCorrectMatch();
+                } else {
+                    this.handleIncorrectMatch();
+                }
+            }
+            
+            handleCorrectMatch() {
+                // 标记为匹配成功
+                this.selectedDiseaseCard.classList.remove('selected');
+                this.selectedDiseaseCard.classList.add('matched');
+                this.selectedSymptomCard.classList.remove('selected');
+                this.selectedSymptomCard.classList.add('matched');
+                
+                this.matches++;
+                this.combo++;
+                
+                // 连击奖励分数
+                const baseScore = 10;
+                const comboBonus = Math.min(this.combo * 2, 20);
+                const timeBonus = Math.max(0, this.timeLeft);
+                const totalScore = baseScore + comboBonus + timeBonus;
+                
+                this.score += totalScore;
+                this.matchedPairs.add(this.selectedDisease);
+                
+                this.showComboMessage(totalScore, comboBonus);
+                this.playMatchAnimation();
+                
+                // 重置选择
+                this.resetSelection();
+                
+                // 检查是否完成当前关卡
+                if (this.matches === this.currentPairs.length) {
+                    this.completeLevel();
+                }
+                
+                this.updateDisplay();
+            }
+            
+            handleIncorrectMatch() {
+                this.combo = 0; // 重置连击
+                this.showMessage("❌ 匹配错误！连击中断", "error-message");
+                this.playErrorAnimation();
+                
+                // 延迟后重置选择
+                setTimeout(() => {
+                    this.resetSelection();
+                }, 1000);
+                
+                this.updateDisplay();
+            }
+            
+            showComboMessage(totalScore, comboBonus) {
+                let message = `✅ 匹配正确！+${totalScore}分`;
+                if (this.combo > 1) {
+                    message += ` (连击x${this.combo}! +${comboBonus}分)`;
+                }
+                if (this.timeLeft > 15) {
+                    message += ` ⚡快速奖励!`;
+                }
+                this.showMessage(message, "success-message");
+            }
+            
+            playMatchAnimation() {
+                // 成功匹配的粒子效果
+                const matchedCards = [this.selectedDiseaseCard, this.selectedSymptomCard];
+                matchedCards.forEach(card => {
+                    this.createSuccessParticles(card);
+                });
+            }
+            
+            playErrorAnimation() {
+                const selectedCards = document.querySelectorAll('.card.selected');
+                selectedCards.forEach(card => {
+                    card.style.animation = 'shake 0.5s ease-in-out';
+                    setTimeout(() => {
+                        card.style.animation = '';
+                    }, 500);
+                });
+            }
+            
+            createSuccessParticles(card) {
+                const rect = card.getBoundingClientRect();
+                const container = document.querySelector('.game-container');
+                
+                for (let i = 0; i < 5; i++) {
+                    const particle = document.createElement('div');
+                    particle.style.position = 'absolute';
+                    particle.style.left = (rect.left + rect.width / 2) + 'px';
+                    particle.style.top = (rect.top + rect.height / 2) + 'px';
+                    particle.style.width = '6px';
+                    particle.style.height = '6px';
+                    particle.style.backgroundColor = '#51cf66';
+                    particle.style.borderRadius = '50%';
+                    particle.style.pointerEvents = 'none';
+                    particle.style.zIndex = '1000';
+                    
+                    document.body.appendChild(particle);
+                    
+                    // 动画
+                    const angle = (i / 5) * Math.PI * 2;
+                    const distance = 50;
+                    const endX = Math.cos(angle) * distance;
+                    const endY = Math.sin(angle) * distance;
+                    
+                    particle.animate([
+                        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+                        { transform: `translate(${endX}px, ${endY}px) scale(0)`, opacity: 0 }
+                    ], {
+                        duration: 600,
+                        easing: 'ease-out'
+                    }).onfinish = () => {
+                        particle.remove();
+                    };
+                }
+            }
+            
+            resetSelection() {
+                document.querySelectorAll('.card').forEach(card => {
+                    if (!card.classList.contains('matched')) {
+                        card.classList.remove('selected');
+                    }
+                });
+                
+                this.selectedDisease = null;
+                this.selectedSymptom = null;
+                this.selectedDiseaseCard = null;
+                this.selectedSymptomCard = null;
+            }
+            
+            completeLevel() {
+                this.stopTimer();
+                this.gameActive = false;
+                
+                // 计算奖励分数
+                const timeBonus = this.timeLeft * 5;
+                const speedBonus = this.timeLeft > 10 ? 50 : 25;
+                const comboBonus = this.combo * 10;
+                const totalBonus = timeBonus + speedBonus + comboBonus;
+                
+                this.score += totalBonus;
+                
+                this.showMessage(`🎉 第${this.currentLevel}关完成！
+                    时间奖励: ${timeBonus}分 | 速度奖励: ${speedBonus}分 | 连击奖励: ${comboBonus}分`, "success-message");
+                
+                this.playLevelCompleteAnimation();
+                
+                // 更新分享数据
+                this.updateShareData(true);
+                
+                if (this.currentLevel < this.levels.length) {
+                    document.getElementById('next-level-btn').style.display = 'inline-block';
+                    // 延迟显示分享选项
+                    setTimeout(() => this.askForShare(), 2000);
+                } else {
+                    this.showMessage("🏆 所有关卡完成！你是真正的医学达人！⚡", "success-message");
+                    // 延迟显示分享选项
+                    setTimeout(() => this.askForShare(), 2000);
+                }
+            }
+            
+            playLevelCompleteAnimation() {
+                // 庆祝动画
+                const container = document.querySelector('.game-container');
+                container.style.animation = 'none';
+                container.offsetHeight;
+                container.style.animation = 'celebration 1s ease-in-out';
+                
+                // 创建庆祝粒子
+                this.createCelebrationParticles();
+            }
+            
+            createCelebrationParticles() {
+                const colors = ['#51cf66', '#4dabf7', '#ffd93d', '#ff6b6b', '#9775fa'];
+                const container = document.querySelector('.game-container');
+                const rect = container.getBoundingClientRect();
+                
+                for (let i = 0; i < 20; i++) {
+                    const particle = document.createElement('div');
+                    particle.style.position = 'absolute';
+                    particle.style.left = (rect.left + rect.width / 2) + 'px';
+                    particle.style.top = (rect.top + rect.height / 2) + 'px';
+                    particle.style.width = '8px';
+                    particle.style.height = '8px';
+                    particle.style.backgroundColor = colors[i % colors.length];
+                    particle.style.borderRadius = '50%';
+                    particle.style.pointerEvents = 'none';
+                    particle.style.zIndex = '1000';
+                    
+                    document.body.appendChild(particle);
+                    
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 100 + Math.random() * 100;
+                    const endX = Math.cos(angle) * distance;
+                    const endY = Math.sin(angle) * distance - 50;
+                    
+                    particle.animate([
+                        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+                        { transform: `translate(${endX}px, ${endY}px) scale(0)`, opacity: 0 }
+                    ], {
+                        duration: 1000 + Math.random() * 500,
+                        easing: 'ease-out'
+                    }).onfinish = () => {
+                        particle.remove();
+                    };
+                }
+            }
+            
+            nextLevel() {
+                this.currentLevel++;
+                this.loadLevel();
+            }
+            
+            restart() {
+                this.stopTimer();
+                this.currentLevel = 1;
+                this.score = 0;
+                this.matches = 0;
+                this.combo = 0;
+                this.loadLevel();
+            }
+            
+            shuffle() {
+                if (!this.gameActive) return;
+                this.renderCards();
+                this.showMessage("🔄 重新排列完成", "");
+            }
+            
+            shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+            
+            showMessage(message, className = "") {
+                const messageElement = document.getElementById('game-message');
+                messageElement.textContent = message;
+                messageElement.className = `game-message ${className}`;
+                
+                if (className) {
+                    setTimeout(() => {
+                        messageElement.className = 'game-message';
+                        if (className === 'error-message') {
+                            messageElement.textContent = '';
+                        }
+                    }, 2000);
+                }
+            }
+            
+            updateDisplay() {
+                document.getElementById('current-level').textContent = this.currentLevel;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('matches').textContent = `${this.matches}/${this.currentPairs ? this.currentPairs.length : 4}`;
+                document.getElementById('combo').textContent = this.combo;
+                
+                // 更新进度条
+                if (this.currentPairs) {
+                    const progress = (this.matches / this.currentPairs.length) * 100;
+                    document.getElementById('progress-bar').style.width = progress + '%';
+                }
+            }
+            
+            // 分享相关方法
+            updateShareData(completed) {
+                this.shareData = {
+                    nickname: '',
+                    level: this.currentLevel,
+                    score: this.score,
+                    timeLeft: this.timeLeft,
+                    completed: completed
+                };
+            }
+            
+            askForShare() {
+                if (confirm("🎉 是否分享你的游戏成绩？让朋友们也来挑战医学知识！")) {
+                    this.showShareModal();
+                }
+            }
+            
+            showShareModal() {
+                const overlay = document.getElementById('share-overlay');
+                const preview = document.getElementById('share-preview');
+                const initialButtons = document.getElementById('share-initial-buttons');
+                
+                // 重置状态
+                preview.style.display = 'none';
+                initialButtons.style.display = 'flex';
+                document.getElementById('nickname-input').value = '';
+                
+                overlay.style.display = 'flex';
+                
+                // 聚焦到输入框
+                setTimeout(() => {
+                    document.getElementById('nickname-input').focus();
+                }, 300);
+            }
+            
+            hideShareModal() {
+                const overlay = document.getElementById('share-overlay');
+                overlay.style.display = 'none';
+            }
+            
+            async generateShareCard() {
+                const nickname = document.getElementById('nickname-input').value.trim();
+                
+                if (!nickname) {
+                    alert('请输入你的昵称！');
+                    return;
+                }
+                
+                this.shareData.nickname = nickname;
+                
+                // 更新卡片内容
+                document.getElementById('share-card-nickname').textContent = nickname;
+                document.getElementById('share-card-level').textContent = this.shareData.level;
+                document.getElementById('share-card-score').textContent = this.shareData.score;
+                document.getElementById('share-card-time').textContent = this.shareData.timeLeft + 's';
+                
+                // 生成二维码
+                await this.generateQRCode();
+                
+                // 显示预览
+                document.getElementById('share-initial-buttons').style.display = 'none';
+                document.getElementById('share-preview').style.display = 'block';
+            }
+            
+            async generateQRCode() {
+                const currentUrl = window.location.href;
+                // 使用免费的二维码API
+                const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(currentUrl)}`;
+                
+                const qrImg = document.getElementById('qr-code-img');
+                qrImg.src = qrApiUrl;
+                
+                return new Promise((resolve) => {
+                    qrImg.onload = resolve;
+                    qrImg.onerror = () => {
+                        // 备用方案：使用另一个API
+                        const backupUrl = `https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=${encodeURIComponent(currentUrl)}`;
+                        qrImg.src = backupUrl;
+                        resolve();
+                    };
+                });
+            }
+            
+            async generateShareImage() {
+                const canvas = document.getElementById('share-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // 清空画布
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制背景渐变
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制光效
+                const shimmerGradient = ctx.createRadialGradient(200, 200, 0, 200, 200, 300);
+                shimmerGradient.addColorStop(0, 'rgba(255,255,255,0.1)');
+                shimmerGradient.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = shimmerGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制标题
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 28px Arial';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+                ctx.fillText('🏥 医学连连看', canvas.width / 2, 60);
+                
+                // 绘制昵称
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText(this.shareData.nickname, canvas.width / 2, 110);
+                
+                // 绘制成绩统计
+                ctx.font = 'bold 20px Arial';
+                const stats = [
+                    { label: '关卡', value: this.shareData.level, x: 100 },
+                    { label: '分数', value: this.shareData.score, x: 200 },
+                    { label: '剩余时间', value: this.shareData.timeLeft + 's', x: 300 }
+                ];
+                
+                stats.forEach(stat => {
+                    // 绘制数值
+                    ctx.font = 'bold 36px Arial';
+                    ctx.fillText(stat.value, stat.x, 200);
+                    // 绘制标签
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                    ctx.fillText(stat.label, stat.x, 225);
+                    ctx.fillStyle = 'white';
+                });
+                
+                // 绘制状态信息
+                ctx.font = '18px Arial';
+                const statusText = this.shareData.completed ? '🎉 挑战成功！' : '💪 继续加油！';
+                ctx.fillText(statusText, canvas.width / 2, 280);
+                
+                // 绘制二维码
+                const qrImg = document.getElementById('qr-code-img');
+                if (qrImg.complete && qrImg.naturalWidth > 0) {
+                    // 绘制白色背景
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(canvas.width/2 - 70, 320, 140, 140);
+                    ctx.drawImage(qrImg, canvas.width/2 - 60, 330, 120, 120);
+                }
+                
+                // 绘制底部文字
+                ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                ctx.font = '14px Arial';
+                ctx.fillText('扫码挑战同款游戏', canvas.width / 2, 490);
+                
+                // 绘制分享信息
+                ctx.font = '12px Arial';
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText('医学连连看 - 争分夺秒学医学', canvas.width / 2, 520);
+                
+                return canvas;
+            }
+            
+            async downloadShareImage() {
+                try {
+                    const canvas = await this.generateShareImage();
+                    
+                    // 创建下载链接
+                    canvas.toBlob((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `医学连连看-${this.shareData.nickname}-${this.shareData.score}分.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 'image/png');
+                    
+                    // 显示成功提示
+                    this.showMessage('🎉 分享图片已保存到本地！', 'success-message');
+                    
+                } catch (error) {
+                    console.error('生成分享图片失败:', error);
+                    alert('生成分享图片失败，请重试');
+                }
+            }
+            
+            regenerateShareCard() {
+                document.getElementById('share-preview').style.display = 'none';
+                document.getElementById('share-initial-buttons').style.display = 'flex';
+            }
+        }
+        
+        // 启动游戏
+        document.addEventListener('DOMContentLoaded', () => {
+            new MedicalMatchGame();
+        });
+    </script>
+</body>
+</html>
